@@ -3,6 +3,23 @@ import { MockFile } from "./types";
 // Sample Legacy Python 2.7 Code
 export const LEGACY_FILES: MockFile[] = [
   {
+    name: "README.md",
+    content: `# Legacy User Service (v1.0)
+DEPRECATED: Do not deploy to production.
+
+This service handles user profiles and configuration loading.
+Last updated: Oct 2014.
+
+## Dependencies
+- Python 2.7
+- Flask 0.12
+
+## Todo
+- Upgrade to Python 3 (Pending since 2018)
+- Fix known security issues with pickle
+`
+  },
+  {
     name: "app.py",
     content: `import os
 import cPickle as pickle

@@ -16,16 +16,15 @@ const RepoInput: React.FC<RepoInputProps> = ({ repoUrl, setRepoUrl, onAnalyze })
       <div className="relative z-10 max-w-3xl w-full space-y-10 text-center">
         <div className="space-y-4">
            <div className="inline-block px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-mono mb-2">
-             DEV_OPS_AGENT_V1.0 :: RUNNING_ON_CLOUD_RUN
+             DEV_OPS_AGENT_V1.0 :: DEPLOYED_ON_CLOUD_RUN
            </div>
            <h2 className="text-4xl md:text-6xl font-black tracking-tighter text-white mb-6">
              Modernize Legacy Code <br />
              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-600">At Scale</span>
            </h2>
            <p className="text-lg text-slate-400 leading-relaxed max-w-2xl mx-auto">
-             Connect your repositories to our <strong>Cloud Run</strong> refactoring service. 
-             We leverage <strong>Gemini's 2 Million Token Context Window</strong> to digest entire projects, 
-             understand global dependencies, and generate production-ready Pull Requests.
+             Enter a GitHub repository URL. Our <strong>Cloud Run</strong> container will clone the code, 
+             feed the entire project into <strong>Gemini 1.5 Pro (2M Context)</strong>, and generate a secure Refactoring Plan.
            </p>
         </div>
 
