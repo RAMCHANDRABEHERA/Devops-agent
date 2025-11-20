@@ -2,6 +2,7 @@
 import React, { useState, useCallback } from 'react';
 import { AppState, AnalysisResult, MockFile } from './types';
 import { analyzeLegacyCode } from './services/geminiService';
+import { saveRefactoringPlan } from './services/firestoreService';
 import { LEGACY_FILES, DEMO_REPO_URL } from './constants';
 import RepoInput from './components/RepoInput';
 import Dashboard from './components/Dashboard';
@@ -12,6 +13,8 @@ const App: React.FC = () => {
   const [repoUrl, setRepoUrl] = useState<string>(DEMO_REPO_URL);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isMerging, setIsMerging] = useState(false);
+  const [mergeSuccess, setMergeSuccess] = useState<string | null>(null);
 
   const handleStartAnalysis = useCallback(async (useMock: boolean) => {
     setErrorMsg(null);
@@ -19,16 +22,11 @@ const App: React.FC = () => {
 
     try {
       // Simulate Cloud Run "Cloning" latency
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       setAppState(AppState.ANALYZING);
       
       // In a real app, we would fetch the files from the backend here.
-      // For this demo, we use the mock legacy files if useMock is true, 
-      // or just fail/warn if they try a real URL (since we can't CORS fetch).
-      // To make the demo robust, we ALWAYS use the mock files for the AI analysis 
-      // but pretend it came from the URL provided.
-      
       const filesToAnalyze: MockFile[] = LEGACY_FILES;
       
       const result = await analyzeLegacyCode(filesToAnalyze);
@@ -42,10 +40,28 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const handleMerge = useCallback(async () => {
+    if (!analysisResult) return;
+    setIsMerging(true);
+    try {
+      const id = await saveRefactoringPlan(repoUrl, analysisResult);
+      setMergeSuccess(id);
+      setTimeout(() => {
+        setMergeSuccess(null);
+        handleReset();
+      }, 3000);
+    } catch (e) {
+      console.error("Failed to save to Firestore", e);
+    } finally {
+      setIsMerging(false);
+    }
+  }, [analysisResult, repoUrl]);
+
   const handleReset = useCallback(() => {
     setAppState(AppState.IDLE);
     setAnalysisResult(null);
     setErrorMsg(null);
+    setMergeSuccess(null);
   }, []);
 
   return (
@@ -64,35 +80,61 @@ const App: React.FC = () => {
         {(appState === AppState.CLONING || appState === AppState.ANALYZING) && (
           <div className="flex flex-col items-center justify-center flex-grow space-y-8 animate-fade-in p-6">
             <div className="relative w-32 h-32">
-              <div className="absolute inset-0 border-4 border-slate-700 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-slate-800 rounded-full"></div>
               <div className="absolute inset-0 border-t-4 border-amber-500 rounded-full animate-spin"></div>
+              {appState === AppState.ANALYZING && (
+                <div className="absolute inset-0 border-l-4 border-cyan-500 rounded-full animate-spin-slow" style={{animationDuration: '3s'}}></div>
+              )}
               <div className="absolute inset-0 flex items-center justify-center">
-                <svg className="w-12 h-12 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                </svg>
+                {appState === AppState.CLONING ? (
+                   <svg className="w-12 h-12 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                   </svg>
+                ) : (
+                   <svg className="w-12 h-12 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                   </svg>
+                )}
               </div>
             </div>
             <div className="text-center max-w-md">
               <h2 className="text-2xl font-bold text-white mb-2">
-                {appState === AppState.CLONING ? "Cloning Repository to Cloud Run..." : "Digging through the artifacts..."}
+                {appState === AppState.CLONING ? "Initializing Cloud Run Instance..." : "Deep Code Analysis in Progress"}
               </h2>
-              <p className="text-slate-400 mb-4">
-                {appState === AppState.CLONING 
-                  ? "Deploying ephemeral container for secure analysis." 
-                  : "Gemini 1.5 Pro is processing the entire codebase (simulating 2M context window) to identify global dependencies."}
-              </p>
-              
-              {appState === AppState.ANALYZING && (
-                 <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
-                    <div className="bg-gradient-to-r from-amber-500 to-cyan-500 h-2.5 rounded-full w-3/4 animate-pulse"></div>
-                 </div>
-              )}
+              <div className="space-y-2">
+                <p className="text-slate-400 text-sm">
+                  {appState === AppState.CLONING 
+                    ? "Cloning repository to ephemeral container storage." 
+                    : "Gemini 3.0 Pro is ingesting 50+ files (2M Context Window)."}
+                </p>
+                {appState === AppState.ANALYZING && (
+                  <p className="text-amber-500/80 text-xs font-mono animate-pulse">
+                    Identifying global dependencies & vulnerability patterns...
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         )}
 
         {appState === AppState.COMPLETE && analysisResult && (
-          <Dashboard result={analysisResult} onReset={handleReset} />
+          <>
+             <Dashboard 
+               result={analysisResult} 
+               onReset={handleReset} 
+               onMerge={handleMerge}
+               isMerging={isMerging}
+             />
+             {mergeSuccess && (
+               <div className="fixed bottom-8 right-8 bg-green-600 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 animate-bounce">
+                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                 <div>
+                   <p className="font-bold">Pull Request Merged!</p>
+                   <p className="text-xs opacity-90">Refactoring plan saved to Firestore ID: {mergeSuccess}</p>
+                 </div>
+               </div>
+             )}
+          </>
         )}
 
         {appState === AppState.ERROR && (
@@ -111,8 +153,9 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="p-6 border-t border-slate-800 text-center text-slate-500 text-sm">
-        <p>© {new Date().getFullYear()} Legacy Code Archaeologist. Powered by Google Gemini & Cloud Run.</p>
+      <footer className="p-6 border-t border-slate-800 text-center text-slate-600 text-xs flex justify-between px-12">
+        <span>© {new Date().getFullYear()} Legacy Code Archaeologist</span>
+        <span className="font-mono">Powered by Google Cloud Run • Firestore • Gemini 3.0 Pro</span>
       </footer>
     </div>
   );

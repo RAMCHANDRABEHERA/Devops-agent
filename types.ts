@@ -21,6 +21,8 @@ export interface RefactoredFile {
 }
 
 export interface AnalysisResult {
+  prTitle: string;
+  prDescription: string;
   summary: string;
   vulnerabilities: Vulnerability[];
   files: RefactoredFile[];

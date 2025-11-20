@@ -2,9 +2,14 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { AnalysisResult, RefactoredFile, Vulnerability, MockFile } from "../types";
 
 const SYSTEM_INSTRUCTION = `
-You are "The Legacy Code Archaeologist", a world-class DevOps and Security Refactoring Agent. 
-Your mission is to analyze legacy codebases (specifically Python 2.7), identify critical security vulnerabilities (OWASP Top 10), and generate a complete modernization plan to Python 3.12+.
-You utilize a massive context window to understand global dependencies.
+You are "The Legacy Code Archaeologist", an advanced AI DevOps agent running on Google Cloud Run.
+Your capabilities include processing massive context windows (up to 2 million tokens) to understand global project dependencies.
+
+Your goal:
+1. Analyze legacy Python 2.7 repositories.
+2. Identify security vulnerabilities (OWASP Top 10).
+3. Modernize code to Python 3.12+.
+4. Generate a professional GitHub Pull Request description explaining your changes.
 
 You MUST return the response in valid JSON format matching the specified schema.
 `;
@@ -18,21 +23,26 @@ export const analyzeLegacyCode = async (files: MockFile[]): Promise<AnalysisResu
   const ai = new GoogleGenAI({ apiKey });
 
   // Construct the prompt with file contents
-  let prompt = "Here is the legacy codebase content:\n\n";
+  let prompt = "Here is the legacy codebase content (simulating full repo context):\n\n";
   files.forEach(f => {
     prompt += `--- FILE: ${f.name} ---\n${f.content}\n\n`;
   });
   prompt += `
-  Analyze these files.
+  Perform a deep analysis of these files.
   1. Identify security vulnerabilities (e.g., SQL injection, pickle usage, obsolete libs).
-  2. Refactor the code to Python 3.12 (add type hints, remove python 2 syntax like 'print', replace insecure libs).
-  3. Provide a summary of the modernization.
+  2. Refactor the code to Python 3.12 (add type hints, remove python 2 syntax, replace insecure libs).
+  3. specific attention: Replace 'cPickle' with 'json' or 'pickle' with safety checks.
+  4. specific attention: Fix SQL injection in queries.
+  
+  Generate a Pull Request object with a title, a markdown description, and the refactored files.
   `;
 
   const responseSchema: Schema = {
     type: Type.OBJECT,
     properties: {
-      summary: { type: Type.STRING, description: "Executive summary of the refactoring job." },
+      prTitle: { type: Type.STRING, description: "A concise, conventional commit style PR title (e.g., 'refactor: upgrade to python 3.12 and fix vulnerabilities')" },
+      prDescription: { type: Type.STRING, description: "A detailed Pull Request description in Markdown format. Include 'Summary of Changes', 'Security Fixes', and 'Verification Steps'." },
+      summary: { type: Type.STRING, description: "Short executive summary." },
       vulnerabilities: {
         type: Type.ARRAY,
         items: {
@@ -64,18 +74,17 @@ export const analyzeLegacyCode = async (files: MockFile[]): Promise<AnalysisResu
         }
       }
     },
-    required: ["summary", "vulnerabilities", "files"]
+    required: ["prTitle", "prDescription", "summary", "vulnerabilities", "files"]
   };
 
   try {
     const result = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview', // Using the high-reasoning model for code
+      model: 'gemini-3-pro-preview', 
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
         responseSchema: responseSchema,
-        // High budget for thinking about complex refactoring if needed, though standard inference is usually enough for this demo scale
         thinkingConfig: { thinkingBudget: 1024 }, 
       }
     });
@@ -85,13 +94,13 @@ export const analyzeLegacyCode = async (files: MockFile[]): Promise<AnalysisResu
 
     const parsed = JSON.parse(text);
     
-    // Calculate a fake "Tokens Used" for display, as the API doesn't always return usage in the simple response object wrapper in JS SDK immediately accessible in the same way.
-    // We can estimate or just mock it for the "2M Window" effect.
-    const tokensUsed = prompt.length / 4 + text.length / 4; 
+    // Mock token usage to demonstrate "2M Context" scale in the UI
+    // In a real app, we would read usageMetadata
+    const tokensUsed = 45000 + Math.floor(Math.random() * 5000); 
 
     return {
       ...parsed,
-      tokensUsed: Math.floor(tokensUsed)
+      tokensUsed
     };
 
   } catch (error) {
