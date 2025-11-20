@@ -1,0 +1,5 @@
+{
+  "name": "Copy of Legacy Code Archaeologist",
+  "description": "An AI-powered DevOps agent that analyzes legacy codebases, identifies vulnerabilities, and automates modernization refactoring using Gemini 1.5 Pro.",
+  "requestFramePermissions": []
+}
